@@ -1,0 +1,4 @@
+bin/
+e2e/
+test.rest
+Makefile

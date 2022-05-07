@@ -9,6 +9,8 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
+	"randgen-game/pkg/resource"
+
 	"github.com/labstack/echo"
 	_ "github.com/lib/pq"
 )
@@ -27,8 +29,8 @@ func main() {
 	e := echo.New()
 
 	e.GET("/", helloworld)
-	e.POST("/rooms", addRoom(db))
-	e.GET("/rooms/:id", getRoom(db))
+	e.POST("/rooms", resource.AddRoom(db))
+	e.GET("/rooms/:id", resource.GetRoom(db))
 
 	e.Logger.Fatal(e.Start(":" + os.Getenv("PORT")))
 }
@@ -37,30 +39,8 @@ func helloworld(c echo.Context) error {
 	return c.String(http.StatusOK, "Hello, World")
 }
 
-type room struct {
-	ID string `gorm:"primaryKey;type:uuid;default:uuid_generate_v4()" json:"id"`
-}
-
-func addRoom(db *gorm.DB) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		r := room{}
-		db.Create(&r)
-		return c.JSON(http.StatusOK, r)
-	}
-}
-
-func getRoom(db *gorm.DB) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		id := c.Param("id")
-		r := room{}
-		db.First(&r, "id = ?", id)
-		return c.JSON(http.StatusOK, r)
-	}
-}
-
 func createTables(db *gorm.DB) {
-	db.Exec(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp";`)
-	db.AutoMigrate(&room{})
+	resource.CreateRoomTable(db)
 	// if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS room (
 	// 	id uuid PRIMARY KEY DEFAULT uuid_generate_v4()
 	// 	)`); err != nil {
