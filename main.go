@@ -59,6 +59,7 @@ func getRoom(db *gorm.DB) echo.HandlerFunc {
 }
 
 func createTables(db *gorm.DB) {
+	db.Exec(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp";`)
 	db.AutoMigrate(&room{})
 	// if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS room (
 	// 	id uuid PRIMARY KEY DEFAULT uuid_generate_v4()
