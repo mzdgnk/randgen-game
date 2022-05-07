@@ -22,10 +22,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error opening gorm database: %q", err)
 	}
+	createTables(db)
 
 	e := echo.New()
-
-	createTables(c, db)
 
 	e.GET("/", helloworld)
 	e.POST("/rooms", addRoom(db))
@@ -59,7 +58,7 @@ func getRoom(db *gorm.DB) echo.HandlerFunc {
 	}
 }
 
-func createTables(c echo.Context, db *gorm.DB) {
+func createTables(db *gorm.DB) {
 	db.AutoMigrate(&room{})
 	// if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS room (
 	// 	id uuid PRIMARY KEY DEFAULT uuid_generate_v4()
