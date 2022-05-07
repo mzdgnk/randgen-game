@@ -10,6 +10,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/labstack/echo"
+	_ "github.com/lib/pq"
 )
 
 var db *gorm.DB
