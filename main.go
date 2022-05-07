@@ -13,19 +13,19 @@ import (
 	_ "github.com/lib/pq"
 )
 
-var db *gorm.DB
-
 func main() {
 	sqlDB, err := sql.Open("postgres", os.Getenv("DATABASE_URL"))
 	if err != nil {
 		log.Fatalf("Error opening database: %q", err)
 	}
-	db, err = gorm.Open(postgres.New(postgres.Config{Conn: sqlDB}), &gorm.Config{})
+	db, err := gorm.Open(postgres.New(postgres.Config{Conn: sqlDB}), &gorm.Config{})
 	if err != nil {
 		log.Fatalf("Error opening gorm database: %q", err)
 	}
 
 	e := echo.New()
+
+	createTables(c, db)
 
 	e.GET("/", helloworld)
 	e.POST("/rooms", addRoom(db))
