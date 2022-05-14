@@ -13,6 +13,9 @@ import (
 )
 
 var host = "localhost:5000"
+
+// func init() { host = "https://randgen-game.herokuapp.com" }
+
 var baseURL = "http://" + host
 var websockURL = "ws://" + host + "/ws"
 

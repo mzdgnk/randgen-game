@@ -45,7 +45,7 @@ func main() {
 	e.Use(middleware.Logger())
 	e.Pre(middleware.RemoveTrailingSlash())
 
-	e.GET("/", helloworld)
+	e.Static("/", "build")
 	e.GET("/ws", wsHandler())
 	e.POST("/rooms", resource.AddRoom(db))
 	e.GET("/rooms", resource.GetRooms(db))
