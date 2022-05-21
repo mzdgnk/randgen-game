@@ -12,6 +12,7 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
+	"randgen-game/pkg/env"
 	"randgen-game/pkg/resource"
 
 	"github.com/labstack/echo"
@@ -44,17 +45,23 @@ func main() {
 	e := echo.New()
 	e.Use(middleware.Logger())
 	e.Pre(middleware.RemoveTrailingSlash())
+	if !env.IsProd {
+		e.Use(middleware.CORS())
+	}
 
 	e.Static("/", "build")
-	e.GET("/ws", wsHandler())
-	e.POST("/rooms", resource.AddRoom(db))
-	e.GET("/rooms", resource.GetRooms(db))
-	e.GET("/rooms/:id", resource.GetRoom(db))
-	e.POST("/rooms/:room_id/users", resource.AddUser(db))
-	e.GET("/rooms/:room_id/users", resource.GetUsers(db))
-	e.GET("/rooms/:room_id/users/:name", resource.GetUser(db))
-	e.POST("/rooms/:room_id/start", resource.StartGame(db))
-	e.POST("/rooms/:room_id/users/:name/open", resource.OpenCard(db))
+	e.Static("/rooms/:id", "build")
+	e.GET("/api/v1/ws", wsHandler())
+	e.POST("/api/v1/rooms", resource.AddRoom(db))
+	e.GET("/api/v1/rooms", resource.GetRooms(db))
+	e.GET("/api/v1/rooms/:id", resource.GetRoom(db))
+	e.POST("/api/v1/rooms/:room_id/users", resource.AddUser(db))
+	e.DELETE("/api/v1/rooms/:room_id/users/:name", resource.DeleteUser(db))
+	e.GET("/api/v1/rooms/:room_id/users", resource.GetUsers(db))
+	e.GET("/api/v1/rooms/:room_id/users/:name", resource.GetUser(db))
+	e.POST("/api/v1/rooms/:room_id/start", resource.StartGame(db))
+	e.POST("/api/v1/rooms/:room_id/end", resource.EndGame(db))
+	e.POST("/api/v1/rooms/:room_id/users/:name/open", resource.OpenCard(db))
 
 	e.Logger.Fatal(e.Start(":" + os.Getenv("PORT")))
 }
@@ -67,7 +74,11 @@ func createTables(db *gorm.DB) error {
 	return resource.CreateTables(db)
 }
 
-var upgrader = websocket.Upgrader{}
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		return true
+	},
+}
 
 func wsHandler() echo.HandlerFunc {
 	return func(c echo.Context) error {
@@ -92,15 +103,11 @@ func wsHandler() echo.HandlerFunc {
 		defer l.Unlisten(string(roomID))
 
 		ctx, cancel := context.WithCancel(c.Request().Context())
-		go func() {
-			for {
-				t, _, err := ws.ReadMessage()
-				if err != nil || t == websocket.CloseMessage {
-					cancel()
-					return
-				}
-			}
-		}()
+		ws.SetCloseHandler(func(code int, text string) error {
+			logger.Info("websocket closed", zap.Int("code", code), zap.String("message", text))
+			cancel()
+			return nil
+		})
 
 		for {
 			select {
@@ -113,8 +120,9 @@ func wsHandler() echo.HandlerFunc {
 			case <-ctx.Done():
 				logger.Info(fmt.Sprintf("canceled room id: %s", roomID))
 				return nil
-			case <-time.After(1 * time.Minute):
+			case <-time.After(5 * time.Minute):
 				logger.Info(fmt.Sprintf("timeout room %s", roomID))
+				return nil
 			}
 		}
 	}

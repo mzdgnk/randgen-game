@@ -5,12 +5,15 @@ local: docker-compose-up bin/randgen-game
 	heroku local web
 
 FORCE:
+build: FORCE
+	npm run-script build
+
+FORCE:
 bin/randgen-game: FORCE
-	go build -o bin/randgen-game main.go
+	go build -tags=local -o bin/randgen-game main.go
 
 docker-compose-up:
 	docker-compose up -d
-	sleep 1
 
 docker-compose-down:
 	docker-compose down

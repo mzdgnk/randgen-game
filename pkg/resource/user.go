@@ -26,6 +26,14 @@ type User struct {
 	Open bool `json:"open"`
 }
 
+func newUser(ormUser orm.User) User {
+	return User{
+		Name: ormUser.Name,
+		Num:  ormUser.Num,
+		Open: ormUser.Open,
+	}
+}
+
 type Users []User
 
 func (users Users) Find(name string) (user User, found bool) {
@@ -74,17 +82,24 @@ func AddUser(db *gorm.DB) echo.HandlerFunc {
 	}
 }
 
-func updateUser(db *gorm.DB, roomID uuid.UUID, u User) error {
-	orm := orm.User{
-		Name:   u.Name,
-		Num:    u.Num,
-		RoomID: roomID,
-		Open:   u.Open,
+func DeleteUser(db *gorm.DB) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		roomID := c.Param("room_id")
+		name := c.Param("name")
+		logger.Info("delete user " + name + " in room " + roomID)
+		uuid, err := uuid.Parse(roomID)
+		if err != nil {
+			return newDefaultErrorResponse(c, http.StatusBadRequest, xerrors.Errorf("invalid room id format : %w", err).Error())
+		}
+
+		if tx := db.Delete(&orm.User{RoomID: uuid, Name: name}); tx.Error != nil {
+			e := xerrors.Errorf("failed to delete users %s in room %s : %w", name, roomID, tx.Error)
+			logger.Error(e.Error())
+			return c.JSON(http.StatusInternalServerError, e.Error())
+		}
+		notify(db, uuid)
+		return c.JSON(http.StatusOK, nil)
 	}
-	if tx := db.Save(&orm); tx.Error != nil {
-		return tx.Error
-	}
-	return nil
 }
 
 func GetUsers(db *gorm.DB) echo.HandlerFunc {
@@ -133,24 +148,19 @@ func getUser(db *gorm.DB, roomID uuid.UUID, username string) (User, error) {
 		return User{}, e
 	}
 	logger.Info(fmt.Sprintf("got user %+v", userORM))
-	return User{
-		Name: userORM.Name,
-		Num:  userORM.Num,
-		Open: userORM.Open,
-	}, nil
-
+	return newUser(userORM), nil
 }
 
 func getUsers(db *gorm.DB, roomID uuid.UUID) (Users, error) {
 	usersORM := []orm.User{}
-	if tx := db.Find(&usersORM, "room_id = ?", roomID); tx.Error != nil {
+	if tx := db.Order("created_at").Find(&usersORM, "room_id = ?", roomID); tx.Error != nil {
 		e := xerrors.Errorf("failed to get users in room %s : %w", roomID, tx.Error)
 		logger.Error(e.Error())
 		return nil, e
 	}
 	users := Users{}
 	for _, orm := range usersORM {
-		users = append(users, User{Name: orm.Name, Num: orm.Num, Open: orm.Open})
+		users = append(users, newUser(orm))
 	}
 	return users, nil
 }
@@ -168,7 +178,9 @@ func OpenCard(db *gorm.DB) echo.HandlerFunc {
 			return newDefaultErrorResponse(c, http.StatusInternalServerError, err.Error())
 		}
 		user.Open = true
-		updateUser(db, uuid, user)
+		if err := db.Model(orm.User{RoomID: uuid, Name: username}).Select("open").Updates(orm.User{Open: true}).Error; err != nil {
+			return newDefaultErrorResponse(c, http.StatusInternalServerError, err.Error())
+		}
 		notify(db, uuid)
 		return c.JSON(http.StatusOK, nil)
 	}

@@ -33,14 +33,6 @@ func AddRoom(db *gorm.DB) echo.HandlerFunc {
 	}
 }
 
-func updateRoom(db *gorm.DB, r Room) error {
-	logger.Info("updating room")
-	if tx := db.Save(&r); tx.Error != nil {
-		return tx.Error
-	}
-	return nil
-}
-
 func GetRoom(db *gorm.DB) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		idStr := c.Param("id")
@@ -57,7 +49,8 @@ func GetRoom(db *gorm.DB) echo.HandlerFunc {
 		if err != nil {
 			return newDefaultErrorResponse(c, http.StatusInternalServerError, err.Error())
 		}
-		return c.JSON(http.StatusOK, RoomWithUsers{Room: r, Users: users})
+		room := RoomWithUsers{Room: r, Users: users}
+		return c.JSON(http.StatusOK, room)
 	}
 }
 
@@ -90,6 +83,7 @@ type StartGameRequest struct {
 
 func StartGame(db *gorm.DB) echo.HandlerFunc {
 	return func(c echo.Context) error {
+		logger.Info("starting game")
 		roomID := c.Param("room_id")
 		uuid, err := uuid.Parse(roomID)
 		if err != nil {
@@ -106,17 +100,13 @@ func StartGame(db *gorm.DB) echo.HandlerFunc {
 			if err != nil {
 				return newDefaultErrorResponse(c, http.StatusInternalServerError, err.Error())
 			}
-			if err := updateRoom(db, Room{ID: uuid, Started: true, Topic: reqBody.Topic}); err != nil {
+			if err := db.Model(Room{ID: uuid}).Select("Started", "Topic").Updates(Room{Started: true, Topic: reqBody.Topic}).Error; err != nil {
 				return newDefaultErrorResponse(c, http.StatusInternalServerError, fmt.Sprintf("failed to update room %s", roomID))
 			}
 			rands := generateRand(len(users))
-			for i, _ := range users {
-				users[i].Num = rands[i]
-				users[i].Open = false
-			}
 			logger.Info(fmt.Sprintf("users: %+v", users))
-			for _, u := range users {
-				if err := updateUser(db, uuid, u); err != nil {
+			for i, u := range users {
+				if err := db.Model(orm.User{RoomID: uuid, Name: u.Name}).Select("num", "open").Updates(orm.User{Num: rands[i], Open: false}).Error; err != nil {
 					return newDefaultErrorResponse(c, http.StatusInternalServerError, err.Error())
 				}
 			}
@@ -148,4 +138,23 @@ func contain(s []int64, e int64) bool {
 		}
 	}
 	return false
+}
+
+func EndGame(db *gorm.DB) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		logger.Info("ending game")
+		roomID := c.Param("room_id")
+
+		uuid, err := uuid.Parse(roomID)
+		if err != nil {
+			return newDefaultErrorResponse(c, http.StatusBadRequest, fmt.Sprintf("invalid room id %s", roomID))
+		}
+
+		if tx := db.Model(&Room{ID: uuid}).Select("started", "topic").Updates(Room{Started: false, Topic: ""}); tx.Error != nil {
+			logger.Error(tx.Error.Error())
+			return newDefaultErrorResponse(c, http.StatusInternalServerError, fmt.Sprintf("failed to update room %s", roomID))
+		}
+		notify(db, uuid)
+		return nil
+	}
 }

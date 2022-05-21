@@ -1,6 +1,8 @@
 package orm
 
 import (
+	"time"
+
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
@@ -25,9 +27,10 @@ type Room struct {
 }
 
 type User struct {
-	Name   string    `gorm:"primaryKey" json:"name"`
-	RoomID uuid.UUID `gorm:"primaryKey" json:"-"`
-	Room   Room      `json:"room"`
-	Num    int64     `gorm:"default:-1"`
-	Open   bool      `gorm:"default:false"`
+	Name      string    `gorm:"primaryKey" json:"name"`
+	RoomID    uuid.UUID `gorm:"primaryKey" json:"-"`
+	Room      Room      `json:"room"`
+	Num       int64     `gorm:"default:-1"`
+	Open      bool      `gorm:"default:false"`
+	CreatedAt time.Time
 }

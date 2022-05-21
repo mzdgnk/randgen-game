@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var host = "localhost:5000"
+var host = "localhost:5000/api/v1"
 
 // func init() { host = "https://randgen-game.herokuapp.com" }
 
@@ -109,6 +109,7 @@ func TestWebsocket(t *testing.T) {
 	}()
 	require.Nil(t, err)
 	ws.WriteMessage(websocket.TextMessage, []byte(added.ID.String()))
+	defer ws.Close()
 	go func() {
 		time.Sleep(time.Second)
 		c.AddUser(added.ID, "user01")
