@@ -34,7 +34,7 @@ const Room = () => {
         });
 
         const rws = new ReconnectingWebSocket(
-            "ws://localhost:5000/api/v1/ws",
+            process.env.REACT_APP_WEBSOCKET_ENDPOINT,
             null,
             { reconnectInterval: 10, reconnectDecay: 2 }
         );
