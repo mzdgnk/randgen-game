@@ -12,7 +12,19 @@ import (
 	"gorm.io/gorm"
 )
 
-type Room orm.Room
+type Room struct {
+	ID      uuid.UUID `json:"id"`
+	Started bool      `json:"started"`
+	Topic   string    `json:"topic"`
+}
+
+func newRoom(orm orm.Room) Room {
+	return Room{
+		ID:      orm.ID,
+		Started: orm.Started,
+		Topic:   orm.Topic,
+	}
+}
 
 type RoomWithUsers struct {
 	Room
@@ -22,14 +34,14 @@ type RoomWithUsers struct {
 func AddRoom(db *gorm.DB) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		logger.Info("creating room")
-		r := Room{}
+		r := orm.Room{}
 		if tx := db.Create(&r); tx.Error != nil {
 			e := errors.Wrap(tx.Error, "failed to create room")
 			logger.Error(e.Error())
 			return c.JSON(http.StatusInternalServerError, e.Error())
 		}
 		logger.Info(fmt.Sprintf("created room: %+v", r))
-		return c.JSON(http.StatusOK, r)
+		return c.JSON(http.StatusOK, newRoom(r))
 	}
 }
 
@@ -67,13 +79,17 @@ func getRoom(db *gorm.DB, id uuid.UUID) (Room, error) {
 func GetRooms(db *gorm.DB) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		logger.Info("getting rooms")
-		rooms := []Room{}
-		if tx := db.Find(&rooms); tx.Error != nil {
+		ormRooms := []orm.Room{}
+		if tx := db.Find(&ormRooms); tx.Error != nil {
 			e := errors.Wrap(tx.Error, "failed to get rooms")
 			logger.Error(e.Error())
 			return c.JSON(http.StatusInternalServerError, e.Error())
 		}
-		return c.JSON(http.StatusOK, rooms)
+		room := []Room{}
+		for _, ormRoom := range ormRooms {
+			room = append(room, newRoom(ormRoom))
+		}
+		return c.JSON(http.StatusOK, room)
 	}
 }
 
@@ -100,7 +116,7 @@ func StartGame(db *gorm.DB) echo.HandlerFunc {
 			if err != nil {
 				return newDefaultErrorResponse(c, http.StatusInternalServerError, err.Error())
 			}
-			if err := db.Model(Room{ID: uuid}).Select("Started", "Topic").Updates(Room{Started: true, Topic: reqBody.Topic}).Error; err != nil {
+			if err := db.Model(orm.Room{ID: uuid}).Select("Started", "Topic").Updates(orm.Room{Started: true, Topic: reqBody.Topic}).Error; err != nil {
 				return newDefaultErrorResponse(c, http.StatusInternalServerError, fmt.Sprintf("failed to update room %s", roomID))
 			}
 			rands := generateRand(len(users))
@@ -150,7 +166,7 @@ func EndGame(db *gorm.DB) echo.HandlerFunc {
 			return newDefaultErrorResponse(c, http.StatusBadRequest, fmt.Sprintf("invalid room id %s", roomID))
 		}
 
-		if tx := db.Model(&Room{ID: uuid}).Select("started", "topic").Updates(Room{Started: false, Topic: ""}); tx.Error != nil {
+		if tx := db.Model(&orm.Room{ID: uuid}).Select("started", "topic").Updates(orm.Room{Started: false, Topic: ""}); tx.Error != nil {
 			logger.Error(tx.Error.Error())
 			return newDefaultErrorResponse(c, http.StatusInternalServerError, fmt.Sprintf("failed to update room %s", roomID))
 		}

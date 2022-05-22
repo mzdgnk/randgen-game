@@ -82,6 +82,6 @@ const Room = () => {
 export default Room;
 
 const style = {
-    "max-width": "1000px",
+    maxWidth: "1000px",
     margin: "0 auto",
 };

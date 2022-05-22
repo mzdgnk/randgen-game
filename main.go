@@ -63,7 +63,12 @@ func main() {
 	e.POST("/api/v1/rooms/:room_id/end", resource.EndGame(db))
 	e.POST("/api/v1/rooms/:room_id/users/:name/open", resource.OpenCard(db))
 
-	e.Logger.Fatal(e.Start(":" + os.Getenv("PORT")))
+	ctx, cancel := context.WithCancel(context.Background())
+	go resource.CleanUpInBackground(ctx, db)
+	if err := e.Start(":" + os.Getenv("PORT")); err != nil {
+		cancel()
+		e.Logger.Fatal(err)
+	}
 }
 
 func helloworld(c echo.Context) error {

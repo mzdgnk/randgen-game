@@ -21,9 +21,10 @@ func CreateTables(db *gorm.DB) error {
 }
 
 type Room struct {
-	ID      uuid.UUID `gorm:"primaryKey;type:uuid;default:gen_random_uuid()" json:"id"`
-	Started bool      `gorm:"default:false" json:"started"`
-	Topic   string    `json:"topic"`
+	ID        uuid.UUID `gorm:"primaryKey;type:uuid;default:gen_random_uuid()" json:"id"`
+	Started   bool      `gorm:"default:false" json:"started"`
+	Topic     string    `json:"topic"`
+	UpdatedAt time.Time
 }
 
 type User struct {
@@ -33,4 +34,5 @@ type User struct {
 	Num       int64     `gorm:"default:-1"`
 	Open      bool      `gorm:"default:false"`
 	CreatedAt time.Time
+	UpdatedAt time.Time
 }
